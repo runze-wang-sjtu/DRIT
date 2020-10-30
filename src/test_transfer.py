@@ -31,7 +31,7 @@ def main():
   # directory
   result_dir = os.path.join(opts.result_dir, opts.name)
   if not os.path.exists(result_dir):
-    os.mkdir(result_dir)
+    os.makedirs(result_dir)
 
   # test
   print('\n--- testing ---')

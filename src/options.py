@@ -35,7 +35,7 @@ class TrainOptions():
     self.parser.add_argument('--n_ep_decay', type=int, default=600, help='epoch start decay learning rate, set -1 if no decay') # 200 * d_iter
     self.parser.add_argument('--resume', type=str, default=None, help='specified the dir of saved models for resume the training')
     self.parser.add_argument('--d_iter', type=int, default=3, help='# of iterations for updating content discriminator')
-    self.parser.add_argument('--gpu', type=int, default=0, help='gpu')
+    self.parser.add_argument('--gpu', type=int, default=1, help='gpu')
 
   def parse(self):
     self.opt = self.parser.parse_args()
@@ -62,7 +62,7 @@ class TestOptions():
     # ouptput related
     self.parser.add_argument('--num', type=int, default=5, help='number of outputs per image')
     self.parser.add_argument('--name', type=str, default='trial', help='folder name to save outputs')
-    self.parser.add_argument('--result_dir', type=str, default='../outputs', help='path for saving result images and models')
+    self.parser.add_argument('--result_dir', type=str, default='../test_outputs', help='path for saving result images and models')
 
     # model related
     self.parser.add_argument('--concat', type=int, default=1, help='concatenate attribute features for translation, set 0 for using feature-wise transform')

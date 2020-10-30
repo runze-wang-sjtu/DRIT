@@ -1,4 +1,4 @@
-import networks
+import networks 
 import torch
 import torch.nn as nn
 
@@ -117,7 +117,7 @@ class DRIT(nn.Module):
     return output
 
   def forward(self):
-    # input images
+    # input images (B*channel*croped_size*croped_size)
     half_size = 1
     real_A = self.input_A
     real_B = self.input_B
@@ -126,11 +126,12 @@ class DRIT(nn.Module):
     self.real_B_encoded = real_B[0:half_size]
     self.real_B_random = real_B[half_size:]
 
-    # get encoded z_c
+    # get encoded z_c 
     self.z_content_a, self.z_content_b = self.enc_c.forward(self.real_A_encoded, self.real_B_encoded)
 
     # get encoded z_a
     if self.concat:
+      # all shapes are 1*8
       self.mu_a, self.logvar_a, self.mu_b, self.logvar_b = self.enc_a.forward(self.real_A_encoded, self.real_B_encoded)
       std_a = self.logvar_a.mul(0.5).exp_()
       eps_a = self.get_z_random(std_a.size(0), std_a.size(1), 'gauss')
@@ -157,16 +158,23 @@ class DRIT(nn.Module):
       self.fake_A_encoded, self.fake_AA_encoded, self.fake_A_random, self.fake_A_random2 = torch.split(output_fakeA, self.z_content_a.size(0), dim=0)
       self.fake_B_encoded, self.fake_BB_encoded, self.fake_B_random, self.fake_B_random2 = torch.split(output_fakeB, self.z_content_a.size(0), dim=0)
     else:
+      # shape:[0.5B*3, 256, size/4, size/4]
       input_content_forA = torch.cat((self.z_content_b, self.z_content_a, self.z_content_b),0)
       input_content_forB = torch.cat((self.z_content_a, self.z_content_b, self.z_content_a),0)
+      # shape:[0.5*B*3,8]
       input_attr_forA = torch.cat((self.z_attr_a, self.z_attr_a, self.z_random),0)
       input_attr_forB = torch.cat((self.z_attr_b, self.z_attr_b, self.z_random),0)
+      #shape:[0.5B*3, channel, size, size] 
       output_fakeA = self.gen.forward_a(input_content_forA, input_attr_forA)
       output_fakeB = self.gen.forward_b(input_content_forB, input_attr_forB)
+      # self.fake_A_encoded (content_b & attribute_a)
+      # self.fake_AA_encoded (content_a & attribute_a)
+      # self.fake_A_random (content_a &  z_random)
       self.fake_A_encoded, self.fake_AA_encoded, self.fake_A_random = torch.split(output_fakeA, self.z_content_a.size(0), dim=0)
       self.fake_B_encoded, self.fake_BB_encoded, self.fake_B_random = torch.split(output_fakeB, self.z_content_a.size(0), dim=0)
 
     # get reconstructed encoded z_c
+    # fake_a_encoded--->z_content_b, fake_b_encoded--->z_content_a
     self.z_content_recon_b, self.z_content_recon_a = self.enc_c.forward(self.fake_A_encoded, self.fake_B_encoded)
 
     # get reconstructed encoded z_a
@@ -182,6 +190,7 @@ class DRIT(nn.Module):
       self.z_attr_recon_a, self.z_attr_recon_b = self.enc_a.forward(self.fake_A_encoded, self.fake_B_encoded)
 
     # second cross translation
+    # z_content_recon_a torch.Size([1, 256, 54, 54]) z_attr_recon_a torch.Size([1, 8]) fake_A_recon torch.Size([1, 3, 216, 216])
     self.fake_A_recon = self.gen.forward_a(self.z_content_recon_a, self.z_attr_recon_a)
     self.fake_B_recon = self.gen.forward_b(self.z_content_recon_b, self.z_attr_recon_b)
 
@@ -193,6 +202,7 @@ class DRIT(nn.Module):
 
     # for latent regression
     if self.concat:
+      # fake_A_random shape[0.5B,channel,size,size]
       self.mu2_a, _, self.mu2_b, _ = self.enc_a.forward(self.fake_A_random, self.fake_B_random)
     else:
       self.z_attr_random_a, self.z_attr_random_b = self.enc_a.forward(self.fake_A_random, self.fake_B_random)
@@ -216,16 +226,18 @@ class DRIT(nn.Module):
 
   def update_D(self, image_a, image_b):
     self.input_A = image_a
-    self.input_B = image_b
+    self.input_B = image_b  
     self.forward()
 
     # update disA
+    #the disA is set up to distinguish which x and u belonges to the x domain
     self.disA_opt.zero_grad()
     loss_D1_A = self.backward_D(self.disA, self.real_A_encoded, self.fake_A_encoded)
     self.disA_loss = loss_D1_A.item()
     self.disA_opt.step()
 
     # update disA2
+    # the disA2 is set up for generating more realistic image from random attribute.
     self.disA2_opt.zero_grad()
     loss_D2_A = self.backward_D(self.disA2, self.real_A_random, self.fake_A_random)
     self.disA2_loss = loss_D2_A.item()

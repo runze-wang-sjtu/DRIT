@@ -121,10 +121,13 @@ class E_content(nn.Module):
     self.convB = nn.Sequential(*encB_c)
 
   def forward(self, xa, xb):
+    # shape [0.5B, image_channel, crped_size, croped_size]
     outputA = self.convA(xa)
     outputB = self.convB(xb)
+    # weihgt sharing for get the content space
     outputA = self.conv_share(outputA)
     outputB = self.conv_share(outputB)
+    # shape [0.5B, 256, size/4, size/4] (size = croped_size)
     return outputA, outputB
 
   def forward_a(self, xa):
@@ -227,9 +230,13 @@ class E_attr_concat(nn.Module):
     self.conv_B = nn.Sequential(*conv_layers_B)
 
   def forward(self, xa, xb):
+    # shape:[0.5B, 256, 1, 1]
     x_conv_A = self.conv_A(xa)
+    # 0.5B*256
     conv_flat_A = x_conv_A.view(xa.size(0), -1)
+    # 1*8
     output_A = self.fc_A(conv_flat_A)
+    # 1*8
     outputVar_A = self.fcVar_A(conv_flat_A)
     x_conv_B = self.conv_B(xb)
     conv_flat_B = x_conv_B.view(xb.size(0), -1)
@@ -369,12 +376,18 @@ class G_concat(nn.Module):
     self.decB4 = nn.Sequential(*decB4)
 
   def forward_a(self, x, z):
+    # shape[0.5B*3, 256, size/4, size/4] 
+    # weight_sharing generator first layer
     out0 = self.dec_share(x)
+    # shape[0.5B*3, 8, size/4, size/4]
     z_img = z.view(z.size(0), z.size(1), 1, 1).expand(z.size(0), z.size(1), x.size(2), x.size(3))
     x_and_z = torch.cat([out0, z_img], 1)
+    # torch.Size([3, 264, 54, 54])
     out1 = self.decA1(x_and_z)
+    # torch.Size([3, 8, 54, 54])
     z_img2 = z.view(z.size(0), z.size(1), 1, 1).expand(z.size(0), z.size(1), out1.size(2), out1.size(3))
     x_and_z2 = torch.cat([out1, z_img2], 1)
+    # torch.Size([3, 136, 108, 108]) 
     out2 = self.decA2(x_and_z2)
     z_img3 = z.view(z.size(0), z.size(1), 1, 1).expand(z.size(0), z.size(1), out2.size(2), out2.size(3))
     x_and_z3 = torch.cat([out2, z_img3], 1)
