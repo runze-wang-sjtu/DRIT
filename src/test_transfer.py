@@ -35,15 +35,16 @@ def main():
 
   # test
   print('\n--- testing ---')
-  for idx1, img1 in enumerate(loader):
+  for idx1, img1_ in enumerate(loader):
     print('{}/{}'.format(idx1, len(loader)))
-    img1 = img1.cuda()
+    img1 = img1_[0].cuda()
+    img_name = img1_[1][0].split('/')[-1].split('.')[0]
     imgs = [img1]
     names = ['input']
-    for idx2, img2 in enumerate(loader_attr):
+    for idx2, img2_ in enumerate(loader_attr):
       if idx2 == opts.num:
         break
-      img2 = img2.cuda()
+      img2 = img2_[0].cuda()
       with torch.no_grad():
         if opts.a2b:
           img = model.test_forward_transfer(img1, img2, a2b=True)
@@ -51,7 +52,7 @@ def main():
           img = model.test_forward_transfer(img2, img1, a2b=False)
       imgs.append(img)
       names.append('output_{}'.format(idx2))
-    save_imgs(imgs, names, os.path.join(result_dir, '{}'.format(idx1)))
+    save_imgs(imgs, names, os.path.join(result_dir, '{}'.format(img_name)))
 
   return
 

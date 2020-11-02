@@ -8,8 +8,8 @@ class TrainOptions():
     self.parser.add_argument('--dataroot', type=str, required=True, help='path of data')
     self.parser.add_argument('--phase', type=str, default='train', help='phase for dataloading')
     self.parser.add_argument('--batch_size', type=int, default=2, help='batch size')
-    self.parser.add_argument('--resize_size', type=int, default=256, help='resized image size for training')
-    self.parser.add_argument('--crop_size', type=int, default=216, help='cropped image size for training')
+    self.parser.add_argument('--resize_size', type=int, default=0, help='resized image size for training')
+    self.parser.add_argument('--crop_size', type=int, default=(280,160), help='cropped image size for training')
     self.parser.add_argument('--input_dim_a', type=int, default=3, help='# of input channels for domain A')
     self.parser.add_argument('--input_dim_b', type=int, default=3, help='# of input channels for domain B')
     self.parser.add_argument('--nThreads', type=int, default=8, help='# of threads for data loader')
@@ -35,7 +35,7 @@ class TrainOptions():
     self.parser.add_argument('--n_ep_decay', type=int, default=600, help='epoch start decay learning rate, set -1 if no decay') # 200 * d_iter
     self.parser.add_argument('--resume', type=str, default=None, help='specified the dir of saved models for resume the training')
     self.parser.add_argument('--d_iter', type=int, default=3, help='# of iterations for updating content discriminator')
-    self.parser.add_argument('--gpu', type=int, default=1, help='gpu')
+    self.parser.add_argument('--gpu', type=int, default=0, help='gpu')
 
   def parse(self):
     self.opt = self.parser.parse_args()
@@ -52,8 +52,8 @@ class TestOptions():
     # data loader related
     self.parser.add_argument('--dataroot', type=str, required=True, help='path of data')
     self.parser.add_argument('--phase', type=str, default='test', help='phase for dataloading')
-    self.parser.add_argument('--resize_size', type=int, default=256, help='resized image size for training')
-    self.parser.add_argument('--crop_size', type=int, default=216, help='cropped image size for training')
+    self.parser.add_argument('--resize_size', type=int, help='resized image size for training')
+    self.parser.add_argument('--crop_size', type=int, help='cropped image size for training')
     self.parser.add_argument('--nThreads', type=int, default=4, help='for data loader')
     self.parser.add_argument('--input_dim_a', type=int, default=3, help='# of input channels for domain A')
     self.parser.add_argument('--input_dim_b', type=int, default=3, help='# of input channels for domain B')
