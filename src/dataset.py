@@ -6,12 +6,13 @@ import random
 import ipdb
 
 class dataset_single(data.Dataset):
-  def __init__(self, opts, setname, input_dim):
+  def __init__(self, opts, setname, input_dim, change2_LR=False):
     self.dataroot = opts.dataroot
     images = os.listdir(os.path.join(self.dataroot, opts.phase + setname))
     self.img = [os.path.join(self.dataroot, opts.phase + setname, x) for x in images]
     self.number = len(self.img)
     self.input_dim = input_dim
+    self.change2_LR = change2_LR
 
     # setup image transformation
     # transforms = [Resize((opts.resize_size, opts.resize_size), Image.BICUBIC)]
@@ -30,7 +31,13 @@ class dataset_single(data.Dataset):
 
   def load_img(self, img_name, input_dim):
     img = Image.open(img_name).convert('RGB')
-    img = self.transforms(img)
+    if self.change2_LR:
+      (w, h) = (img.width//4, img.height//4)
+      img_LR = img.resize((w, h),Image.BICUBIC)
+      img_up = img_LR.resize((img.width, img.height), Image.BICUBIC)
+      img = self.transforms(img_up)
+    else:
+      img = self.transforms(img)
     if input_dim == 1:
       img = img[0, ...] * 0.299 + img[1, ...] * 0.587 + img[2, ...] * 0.114
       img = img.unsqueeze(0)
@@ -74,20 +81,34 @@ class dataset_unpair(data.Dataset):
 
   def __getitem__(self, index):
     if self.dataset_size == self.A_size:
-      data_A = self.load_img(self.A[index], self.input_dim_A)
+      data_A = self.load_img(self.A[index], self.input_dim_A, change2LR=True)
       data_B = self.load_img(self.B[random.randint(0, self.B_size - 1)], self.input_dim_B)
     else:
-      data_A = self.load_img(self.A[random.randint(0, self.A_size - 1)], self.input_dim_A)
+      data_A = self.load_img(self.A[random.randint(0, self.A_size - 1)], self.input_dim_A, change2LR=True)
       data_B = self.load_img(self.B[index], self.input_dim_B)
     return data_A, data_B
 
-  def load_img(self, img_name, input_dim):
-    img = Image.open(img_name).convert('RGB')
-    img = self.transforms(img)
-    if input_dim == 1:
-      img = img[0, ...] * 0.299 + img[1, ...] * 0.587 + img[2, ...] * 0.114
-      img = img.unsqueeze(0)
-    return img
+  def load_img(self, img_name, input_dim, change2LR=False):
+    if change2LR:
+      img = Image.open(img_name).convert('RGB')
+      (w, h) = (img.width//4, img.height//4)
+      img_LR = img.resize((w, h),Image.BICUBIC)
+      img_up = img_LR.resize((img.width, img.height), Image.BICUBIC)
+      img_input = self.transforms(img_up)
+      img_HR = self.transforms(img)
+      if input_dim == 1:
+        img_input  = img_input[0, ...] * 0.299 + img_input[1, ...] * 0.587 + img_input[2, ...] * 0.114
+        img_input = img_input.unsqueeze(0)
+        img_HR  = img_HR[0, ...] * 0.299 + img_HR[1, ...] * 0.587 + img_HR[2, ...] * 0.114
+        img_HR = img_HR.unsqueeze(0)
+      return (img_input, img_HR)
+    else:
+      img = Image.open(img_name).convert('RGB')
+      img = self.transforms(img)
+      if input_dim == 1:
+        img = img[0, ...] * 0.299 + img[1, ...] * 0.587 + img[2, ...] * 0.114
+        img = img.unsqueeze(0)
+      return img
 
   def __len__(self):
     return self.dataset_size

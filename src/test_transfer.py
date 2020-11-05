@@ -12,7 +12,7 @@ def main():
 
   # data loader
   print('\n--- load dataset ---')
-  datasetA = dataset_single(opts, 'A', opts.input_dim_a)
+  datasetA = dataset_single(opts, 'A', opts.input_dim_a, change2_LR=True)
   datasetB = dataset_single(opts, 'B', opts.input_dim_b)
   if opts.a2b:
     loader = torch.utils.data.DataLoader(datasetA, batch_size=1, num_workers=opts.nThreads)

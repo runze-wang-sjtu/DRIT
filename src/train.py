@@ -38,19 +38,22 @@ def main():
     max_it = 500000
     for ep in range(ep0, opts.n_ep):
         for it, (images_a, images_b) in enumerate(train_loader):
-            if images_a.size(0) != opts.batch_size or images_b.size(0) != opts.batch_size:
+            images_a_lr = images_a[0]
+            images_a_hr = images_a[1]
+            if images_a_lr.size(0) != opts.batch_size or images_b.size(0) != opts.batch_size:
                 continue
 
             # input data
-            images_a = images_a.cuda(opts.gpu).detach()
+            images_a_lr = images_a_lr.cuda(opts.gpu).detach()
+            images_a_hr = images_a_hr.cuda(opts.gpu).detach()
             images_b = images_b.cuda(opts.gpu).detach()
 
             # update model
             if (it + 1) % opts.d_iter != 0 and it < len(train_loader) - 2:
-                model.update_D_content(images_a, images_b)
+                model.update_D_content(images_a_lr, images_b)
                 continue
             else:
-                model.update_D(images_a, images_b)
+                model.update_D(images_a_lr,images_a_hr, images_b)
                 model.update_EG()
 
             # save to display file

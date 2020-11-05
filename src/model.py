@@ -120,9 +120,12 @@ class DRIT(nn.Module):
     # input images (B*channel*croped_size*croped_size)
     half_size = 1
     real_A = self.input_A
+    real_A_HR = self.input_A_HR
     real_B = self.input_B
     self.real_A_encoded = real_A[0:half_size]
     self.real_A_random = real_A[half_size:]
+    self.real_A_encoded_HR = real_A_HR[0:half_size]
+    self.real_A_random_HR = real_A_HR[half_size:]
     self.real_B_encoded = real_B[0:half_size]
     self.real_B_random = real_B[half_size:]
 
@@ -224,22 +227,23 @@ class DRIT(nn.Module):
     nn.utils.clip_grad_norm_(self.disContent.parameters(), 5)
     self.disContent_opt.step()
 
-  def update_D(self, image_a, image_b):
+  def update_D(self, image_a, image_a_hr, image_b):
     self.input_A = image_a
+    self.input_A_HR = image_a_hr
     self.input_B = image_b  
     self.forward()
 
     # update disA
     #the disA is set up to distinguish which x and u belonges to the x domain
     self.disA_opt.zero_grad()
-    loss_D1_A = self.backward_D(self.disA, self.real_A_encoded, self.fake_A_encoded)
+    loss_D1_A = self.backward_D(self.disA, self.real_A_encoded_HR, self.fake_A_encoded)
     self.disA_loss = loss_D1_A.item()
     self.disA_opt.step()
 
     # update disA2
     # the disA2 is set up for generating more realistic image from random attribute.
     self.disA2_opt.zero_grad()
-    loss_D2_A = self.backward_D(self.disA2, self.real_A_random, self.fake_A_random)
+    loss_D2_A = self.backward_D(self.disA2, self.real_A_random_HR, self.fake_A_random)
     self.disA2_loss = loss_D2_A.item()
     if not self.no_ms:
       loss_D2_A2 = self.backward_D(self.disA2, self.real_A_random, self.fake_A_random2)
@@ -340,7 +344,7 @@ class DRIT(nn.Module):
     # cross cycle consistency loss
     loss_G_L1_A = self.criterionL1(self.fake_A_recon, self.real_A_encoded) * 10
     loss_G_L1_B = self.criterionL1(self.fake_B_recon, self.real_B_encoded) * 10
-    loss_G_L1_AA = self.criterionL1(self.fake_AA_encoded, self.real_A_encoded) * 10
+    loss_G_L1_AA = self.criterionL1(self.fake_AA_encoded, self.real_A_encoded_HR) * 10
     loss_G_L1_BB = self.criterionL1(self.fake_BB_encoded, self.real_B_encoded) * 10
 
     loss_G = loss_G_GAN_A + loss_G_GAN_B + \
