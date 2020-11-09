@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import functools
 from torch.optim import lr_scheduler
+from attention import PAM_Module, CAM_Module
 import torch.nn.functional as F
 
 ####################################################################
@@ -111,11 +112,20 @@ class E_content(nn.Module):
     for i in range(0, 3):
       encB_c += [INSResBlock(tch, tch)]
 
-    enc_share = []
-    for i in range(0, 1):
-      enc_share += [INSResBlock(tch, tch)]
-      enc_share += [GaussianNoiseLayer()]
-      self.conv_share = nn.Sequential(*enc_share)
+    # enc_share = []
+    # for i in range(0, 1):
+    #   enc_share += [INSResBlock(tch, tch)]
+    #   enc_share += [GaussianNoiseLayer()]
+    #   self.conv_share = nn.Sequential(*enc_share)
+    self.enc_share_head = INSResBlock(tch, tch)
+    self.enc_share_pam = PAM_Module(tch)
+    self.enc_share_cam = CAM_Module(tch)
+    self.enc_share_noise = GaussianNoiseLayer()
+    self.enc_fusion = nn.Sequential(
+      nn.Conv2d(2*tch, tch, kernel_size=3, padding=1, stride=1),
+      nn.InstanceNorm2d(tch),
+      nn.ReLU(inplace=True)
+    )
 
     self.convA = nn.Sequential(*encA_c)
     self.convB = nn.Sequential(*encB_c)
@@ -124,10 +134,27 @@ class E_content(nn.Module):
     # shape [0.5B, image_channel, crped_size, croped_size]
     outputA = self.convA(xa)
     outputB = self.convB(xb)
-    # weihgt sharing for get the content space
-    outputA = self.conv_share(outputA)
-    outputB = self.conv_share(outputB)
-    # shape [0.5B, 256, size/4, size/4] (size = croped_size)
+
+    # # weihgt sharing for get the content space
+    # outputA = self.conv_share(outputA)
+    # outputB = self.conv_share(outputB)
+    # # shape [0.5B, 256, size/4, size/4] (size = croped_size)
+    
+    # ! Dual attention module
+    A_head = self.enc_share_head(outputA)
+    A_pam = self.enc_share_pam(A_head)
+    A_cam = self.enc_share_cam(A_head)
+    A_concat = torch.cat([A_pam, A_cam], 1)
+    A_fusion = self.enc_fusion(A_concat)
+    outputA = self.enc_share_noise(A_fusion)
+
+    B_head = self.enc_share_head(outputB)
+    B_pam = self.enc_share_pam(B_head)
+    B_cam = self.enc_share_cam(B_head)
+    B_concat = torch.cat([B_pam, B_cam], 1)
+    B_fusion = self.enc_fusion(B_concat)
+    outputB = self.enc_share_noise(B_fusion)
+
     return outputA, outputB
 
   def forward_a(self, xa):

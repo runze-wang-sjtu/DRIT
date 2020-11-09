@@ -1,6 +1,8 @@
 import networks 
 import torch
 import torch.nn as nn
+from attention import PAM_Module, CAM_Module
+
 
 class DRIT(nn.Module):
   def __init__(self, opts):
