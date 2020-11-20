@@ -9,7 +9,7 @@ class TrainOptions():
     self.parser.add_argument('--phase', type=str, default='train', help='phase for dataloading')
     self.parser.add_argument('--batch_size', type=int, default=2, help='batch size')
     self.parser.add_argument('--resize_size', type=int, default=0, help='resized image size for training')
-    self.parser.add_argument('--crop_size', type=int, default=(280,160), help='cropped image size for training')
+    self.parser.add_argument('--crop_size', type=int, default=(140,180), help='cropped image size for training')
     self.parser.add_argument('--input_dim_a', type=int, default=3, help='# of input channels for domain A')
     self.parser.add_argument('--input_dim_b', type=int, default=3, help='# of input channels for domain B')
     self.parser.add_argument('--nThreads', type=int, default=8, help='# of threads for data loader')
