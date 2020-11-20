@@ -37,6 +37,9 @@ class TrainOptions():
     self.parser.add_argument('--d_iter', type=int, default=3, help='# of iterations for updating content discriminator')
     self.parser.add_argument('--gpu', type=int, default=0, help='gpu')
 
+    # attention related
+    self.parser.add_argument('--ratio', type=float, default=0.2, help='attention ratio')
+
   def parse(self):
     self.opt = self.parser.parse_args()
     args = vars(self.opt)

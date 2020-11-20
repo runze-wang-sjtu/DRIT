@@ -27,7 +27,7 @@ class DRIT(nn.Module):
     self.disContent = networks.Dis_content()
 
     # encoders
-    self.enc_c = networks.E_content(opts.input_dim_a, opts.input_dim_b)
+    self.enc_c = networks.E_content(opts.input_dim_a, opts.input_dim_b, opts.ratio)
     if self.concat:
       self.enc_a = networks.E_attr_concat(opts.input_dim_a, opts.input_dim_b, self.nz, \
           norm_layer=None, nl_layer=networks.get_non_linearity(layer_type='lrelu'))

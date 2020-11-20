@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import functools
 from torch.optim import lr_scheduler
+from attention import PAM_Module, CAM_Module
 import torch.nn.functional as F
 
 ####################################################################
@@ -91,8 +92,9 @@ class Dis(nn.Module):
 #---------------------------- Encoders -----------------------------
 ####################################################################
 class E_content(nn.Module):
-  def __init__(self, input_dim_a, input_dim_b):
+  def __init__(self, input_dim_a, input_dim_b, ratio):
     super(E_content, self).__init__()
+    self.ratio = ratio
     encA_c = []
     tch = 64
     encA_c += [LeakyReLUConv2d(input_dim_a, tch, kernel_size=7, stride=1, padding=3)]
@@ -111,11 +113,20 @@ class E_content(nn.Module):
     for i in range(0, 3):
       encB_c += [INSResBlock(tch, tch)]
 
-    enc_share = []
+    # ! share base
+    enc_share_base = []
     for i in range(0, 1):
-      enc_share += [INSResBlock(tch, tch)]
-      enc_share += [GaussianNoiseLayer()]
-      self.conv_share = nn.Sequential(*enc_share)
+      enc_share_base += [INSResBlock(tch, tch)]
+      enc_share_base += [GaussianNoiseLayer()]
+      self.conv_share_base = nn.Sequential(*enc_share_base)
+    
+    # ! share PAM attention 
+    enc_share_PAM = []
+    for i in range(0, 1):
+      enc_share_PAM += [INSResBlock(tch, tch)]
+      enc_share_PAM += [PAM_Module(tch)]
+      enc_share_PAM += [GaussianNoiseLayer()]
+      self.conv_share_PAM = nn.Sequential(*enc_share_PAM)
 
     self.convA = nn.Sequential(*encA_c)
     self.convB = nn.Sequential(*encB_c)
@@ -124,9 +135,18 @@ class E_content(nn.Module):
     # shape [0.5B, image_channel, crped_size, croped_size]
     outputA = self.convA(xa)
     outputB = self.convB(xb)
-    # weihgt sharing for get the content space
-    outputA = self.conv_share(outputA)
-    outputB = self.conv_share(outputB)
+
+    # ! base weihgt sharing for get the content space
+    outputA_base = self.conv_share_base(outputA)
+    outputB_base = self.conv_share_base(outputB)
+
+    # ! PAM weight sharing for get hte content space
+    outputA_PAM = self.conv_share_PAM(outputA)
+    outputB_PAM = self.conv_share_PAM(outputB)
+
+    outputA = outputA_PAM * self.ratio + (1 - self.ratio)*outputA_base
+    outputB = outputB_PAM * self.ratio + (1 - self.ratio)*outputB_base
+
     # shape [0.5B, 256, size/4, size/4] (size = croped_size)
     return outputA, outputB
 
