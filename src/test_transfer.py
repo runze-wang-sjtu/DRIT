@@ -42,19 +42,19 @@ def main():
     imgs = [img1]
     names = ['input']
     for idx2, img2_ in enumerate(loader_attr):
-      if idx2 == opts.num:
+      if img2_[1][0].split('/')[-1].split('_')[1] == img_name.split('_')[1]:
+        print(img2_[1][0].split('/')[-1])
+        img2 = img2_[0].cuda()
+        with torch.no_grad():
+          if opts.a2b:
+            img = model.test_forward_transfer(img1, img2, a2b=True)
+          else:
+            img = model.test_forward_transfer(img2, img1, a2b=False)
+        imgs.append(img)
+        names.append('output_{}'.format(0))
         break
-      img2 = img2_[0].cuda()
-      with torch.no_grad():
-        if opts.a2b:
-          img = model.test_forward_transfer(img1, img2, a2b=True)
-        else:
-          img = model.test_forward_transfer(img2, img1, a2b=False)
-      imgs.append(img)
-      names.append('output_{}'.format(idx2))
     save_imgs(imgs, names, os.path.join(result_dir, '{}'.format(img_name)))
 
-  return
 
 if __name__ == '__main__':
   main()
