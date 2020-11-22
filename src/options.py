@@ -73,6 +73,9 @@ class TestOptions():
     self.parser.add_argument('--resume', type=str, required=True, help='specified the dir of saved models for resume the training')
     self.parser.add_argument('--gpu', type=int, default=0, help='gpu')
 
+    # attention related
+    self.parser.add_argument('--ratio', type=float, default=0.2, help='attention ratio')
+
   def parse(self):
     self.opt = self.parser.parse_args()
     args = vars(self.opt)
