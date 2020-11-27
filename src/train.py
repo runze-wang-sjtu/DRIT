@@ -14,7 +14,7 @@ def main():
     print('\n--- load dataset ---')
     dataset = dataset_unpair(opts)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=opts.batch_size, shuffle=True,
-                                               num_workers=opts.nThreads)
+                                                num_workers=opts.nThreads)
 
     # model
     print('\n--- load model ---')
@@ -35,6 +35,7 @@ def main():
 
     # train
     print('\n--- train ---')
+    model.train()
     max_it = 500000
     for ep in range(ep0, opts.n_ep):
         for it, (images_a, images_b) in enumerate(train_loader):
@@ -74,8 +75,11 @@ def main():
         # Save network weights
         saver.write_model(ep, total_it, model)
 
-    return
+        # # eval
+        # model.eval()
 
+
+    return
 
 if __name__ == '__main__':
     main()
