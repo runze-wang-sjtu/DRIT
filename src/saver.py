@@ -48,9 +48,6 @@ class Saver():
       members = [attr for attr in dir(model) if not callable(getattr(model, attr)) and not attr.startswith("__") and 'loss' in attr]
       for m in members:
         self.writer.add_scalar(m, getattr(model, m), total_it)
-      # write img
-      image_dis = torchvision.utils.make_grid(model.image_display, nrow=model.image_display.size(0)//2)/2 + 0.5
-      self.writer.add_image('Image', image_dis, total_it)
 
   # save result images
   def write_img(self, ep, model):

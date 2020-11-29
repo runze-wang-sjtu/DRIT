@@ -5,13 +5,15 @@ class TrainOptions():
     self.parser = argparse.ArgumentParser()
 
     # data loader related
-    self.parser.add_argument('--dataroot', type=str, required=True, help='path of data')
+    self.parser.add_argument('--dataroot', type=str, required=True, 
+                            default='/Users/runze.wang/Data/Brain_MRI_CT/11.22_later/bit8',
+                            help='path of data')
     self.parser.add_argument('--phase', type=str, default='train', help='phase for dataloading')
     self.parser.add_argument('--batch_size', type=int, default=2, help='batch size')
     self.parser.add_argument('--resize_size', type=int, default=256, help='resized image size for training')
     self.parser.add_argument('--crop_size', type=int, default=216, help='cropped image size for training')
-    self.parser.add_argument('--input_dim_a', type=int, default=3, help='# of input channels for domain A')
-    self.parser.add_argument('--input_dim_b', type=int, default=3, help='# of input channels for domain B')
+    self.parser.add_argument('--input_dim_MR', type=int, default=3, help='# of input channels for domain A')
+    self.parser.add_argument('--input_dim_CT', type=int, default=3, help='# of input channels for domain B')
     self.parser.add_argument('--nThreads', type=int, default=8, help='# of threads for data loader')
     self.parser.add_argument('--no_flip', action='store_true', help='specified if no flipping')
 
