@@ -15,30 +15,30 @@ class DRIT(nn.Module):
 
     # discriminators
     if opts.dis_scale > 1:
-      self.disA = networks.MultiScaleDis(opts.input_dim_a, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disB = networks.MultiScaleDis(opts.input_dim_b, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disA2 = networks.MultiScaleDis(opts.input_dim_a, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disB2 = networks.MultiScaleDis(opts.input_dim_b, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disA = networks.MultiScaleDis(opts.input_dim_MR, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disB = networks.MultiScaleDis(opts.input_dim_CT, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disA2 = networks.MultiScaleDis(opts.input_dim_MR, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disB2 = networks.MultiScaleDis(opts.input_dim_CT, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
     else:
-      self.disA = networks.Dis(opts.input_dim_a, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disB = networks.Dis(opts.input_dim_b, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disA2 = networks.Dis(opts.input_dim_a, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disB2 = networks.Dis(opts.input_dim_b, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disA = networks.Dis(opts.input_dim_MR, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disB = networks.Dis(opts.input_dim_CT, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disA2 = networks.Dis(opts.input_dim_MR, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disB2 = networks.Dis(opts.input_dim_CT, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
     self.disContent = networks.Dis_content()
 
     # encoders
-    self.enc_c = networks.E_content(opts.input_dim_a, opts.input_dim_b)
+    self.enc_c = networks.E_content(opts.input_dim_MR, opts.input_dim_CT)
     if self.concat:
-      self.enc_a = networks.E_attr_concat(opts.input_dim_a, opts.input_dim_b, self.nz, \
+      self.enc_a = networks.E_attr_concat(opts.input_dim_MR, opts.input_dim_CT, self.nz, \
           norm_layer=None, nl_layer=networks.get_non_linearity(layer_type='lrelu'))
     else:
-      self.enc_a = networks.E_attr(opts.input_dim_a, opts.input_dim_b, self.nz)
+      self.enc_a = networks.E_attr(opts.input_dim_MR, opts.input_dim_CT, self.nz)
 
     # generator
     if self.concat:
-      self.gen = networks.G_concat(opts.input_dim_a, opts.input_dim_b, nz=self.nz)
+      self.gen = networks.G_concat(opts.input_dim_MR, opts.input_dim_CT, nz=self.nz)
     else:
-      self.gen = networks.G(opts.input_dim_a, opts.input_dim_b, nz=self.nz)
+      self.gen = networks.G(opts.input_dim_MR, opts.input_dim_CT, nz=self.nz)
 
     # optimizers
     self.disA_opt = torch.optim.Adam(self.disA.parameters(), lr=lr, betas=(0.5, 0.999), weight_decay=0.0001)
@@ -483,7 +483,7 @@ class DRIT(nn.Module):
               }
     torch.save(state, filename)
     return
-
+    
   def assemble_outputs(self):
     images_a = self.normalize_image(self.real_A_encoded).detach()
     images_b = self.normalize_image(self.real_B_encoded).detach()
@@ -495,9 +495,48 @@ class DRIT(nn.Module):
     images_b2 = self.normalize_image(self.fake_B_random).detach()
     images_b3 = self.normalize_image(self.fake_B_recon).detach()
     images_b4 = self.normalize_image(self.fake_BB_encoded).detach()
-    row1 = torch.cat((images_a[0:1, ::], images_b1[0:1, ::], images_b2[0:1, ::], images_a4[0:1, ::], images_a3[0:1, ::]),3)
-    row2 = torch.cat((images_b[0:1, ::], images_a1[0:1, ::], images_a2[0:1, ::], images_b4[0:1, ::], images_b3[0:1, ::]),3)
-    return torch.cat((row1,row2),2)
 
+    row1 = torch.cat((images_a[0:1, ::], 
+                      images_b1[0:1, ::], 
+                      images_b2[0:1, ::], 
+                      images_a4[0:1, ::], 
+                      images_a3[0:1, ::]),2)
+    row1_0 = torch.cat((images_a[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b1[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b2[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a4[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a3[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1)),2)
+    row1_1 = torch.cat((images_a[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b1[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b2[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a4[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a3[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1)),2)
+    row1_2 = torch.cat((images_a[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b1[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b2[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a4[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a3[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1)),2)
+
+    row2 = torch.cat((images_b[0:1, ::], 
+                      images_a1[0:1, ::], 
+                      images_a2[0:1, ::], 
+                      images_b4[0:1, ::], 
+                      images_b3[0:1, ::]),2)
+    row2_0 = torch.cat((images_b[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a1[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a2[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b4[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b3[0:1, 0, ::].unsqueeze(1).repeat(1,3,1,1)),2)
+    row2_1 = torch.cat((images_b[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a1[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a2[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b4[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b3[0:1, 1, ::].unsqueeze(1).repeat(1,3,1,1)),2)
+    row2_2 = torch.cat((images_b[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a1[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_a2[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b4[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1), 
+                        images_b3[0:1, 2, ::].unsqueeze(1).repeat(1,3,1,1)),2)
+    return torch.cat((row1, row1_0, row1_1, row1_2, row2, row2_0, row2_1, row2_2),3)
   def normalize_image(self, x):
     return x[:,0:3,:,:]
