@@ -15,10 +15,10 @@ class DRIT(nn.Module):
 
     # discriminators
     if opts.dis_scale > 1:
-      self.disA = networks.MultiScaleDis(opts.input_dim_MR, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disB = networks.MultiScaleDis(opts.input_dim_CT, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disA2 = networks.MultiScaleDis(opts.input_dim_MR, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
-      self.disB2 = networks.MultiScaleDis(opts.input_dim_CT, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disA = networks.MultiScaleDis(opts.input_dim_MR_slice, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disB = networks.MultiScaleDis(opts.input_dim_CT_slice, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disA2 = networks.MultiScaleDis(opts.input_dim_MR_slice, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
+      self.disB2 = networks.MultiScaleDis(opts.input_dim_CT_slice, opts.dis_scale, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
     else:
       self.disA = networks.Dis(opts.input_dim_MR, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
       self.disB = networks.Dis(opts.input_dim_CT, norm=opts.dis_norm, sn=opts.dis_spectral_norm)
@@ -232,14 +232,18 @@ class DRIT(nn.Module):
     # update disA
     #the disA is set up to distinguish which x and u belonges to the x domain
     self.disA_opt.zero_grad()
-    loss_D1_A = self.backward_D(self.disA, self.real_A_encoded, self.fake_A_encoded)
+    loss_D1_A = self.backward_D(self.disA, self.real_A_encoded[:,0,::].unsqueeze(1), self.fake_A_encoded[:,0,::].unsqueeze(1)) +\
+                self.backward_D(self.disA, self.real_A_encoded[:,1,::].unsqueeze(1), self.fake_A_encoded[:,1,::].unsqueeze(1))+\
+                self.backward_D(self.disA, self.real_A_encoded[:,2,::].unsqueeze(1), self.fake_A_encoded[:,2,::].unsqueeze(1))
     self.disA_loss = loss_D1_A.item()
     self.disA_opt.step()
 
     # update disA2
     # the disA2 is set up for generating more realistic image from random attribute.
     self.disA2_opt.zero_grad()
-    loss_D2_A = self.backward_D(self.disA2, self.real_A_random, self.fake_A_random)
+    loss_D2_A = self.backward_D(self.disA2, self.real_A_random[:,0,::].unsqueeze(1), self.fake_A_random[:,0,::].unsqueeze(1)) +\
+                self.backward_D(self.disA2, self.real_A_random[:,1,::].unsqueeze(1), self.fake_A_random[:,1,::].unsqueeze(1)) +\
+                self.backward_D(self.disA2, self.real_A_random[:,2,::].unsqueeze(1), self.fake_A_random[:,2,::].unsqueeze(1))
     self.disA2_loss = loss_D2_A.item()
     if not self.no_ms:
       loss_D2_A2 = self.backward_D(self.disA2, self.real_A_random, self.fake_A_random2)
@@ -248,13 +252,17 @@ class DRIT(nn.Module):
 
     # update disB
     self.disB_opt.zero_grad()
-    loss_D1_B = self.backward_D(self.disB, self.real_B_encoded, self.fake_B_encoded)
+    loss_D1_B = self.backward_D(self.disB, self.real_B_encoded[:,0,::].unsqueeze(1), self.fake_B_encoded[:,0,::].unsqueeze(1)) +\
+                self.backward_D(self.disB, self.real_B_encoded[:,1,::].unsqueeze(1), self.fake_B_encoded[:,1,::].unsqueeze(1))+\
+                self.backward_D(self.disB, self.real_B_encoded[:,2,::].unsqueeze(1), self.fake_B_encoded[:,2,::].unsqueeze(1))
     self.disB_loss = loss_D1_B.item()
     self.disB_opt.step()
 
     # update disB2
     self.disB2_opt.zero_grad()
-    loss_D2_B = self.backward_D(self.disB2, self.real_B_random, self.fake_B_random)
+    loss_D2_B = self.backward_D(self.disB2, self.real_B_random[:,0,::].unsqueeze(1), self.fake_B_random[:,0,::].unsqueeze(1)) +\
+                self.backward_D(self.disB2, self.real_B_random[:,1,::].unsqueeze(1), self.fake_B_random[:,1,::].unsqueeze(1)) +\
+                self.backward_D(self.disB2, self.real_B_random[:,2,::].unsqueeze(1), self.fake_B_random[:,2,::].unsqueeze(1))
     self.disB2_loss = loss_D2_B.item()
     if not self.no_ms:
       loss_D2_B2 = self.backward_D(self.disB2, self.real_B_random, self.fake_B_random2)
@@ -320,8 +328,14 @@ class DRIT(nn.Module):
     loss_G_GAN_Bcontent = self.backward_G_GAN_content(self.z_content_b)
 
     # Ladv for generator
-    loss_G_GAN_A = self.backward_G_GAN(self.fake_A_encoded, self.disA)
-    loss_G_GAN_B = self.backward_G_GAN(self.fake_B_encoded, self.disB)
+    loss_G_GAN_A_0 = self.backward_G_GAN(self.fake_A_encoded[:,0,::].unsqueeze(1), self.disA)
+    loss_G_GAN_A_1 = self.backward_G_GAN(self.fake_A_encoded[:,1,::].unsqueeze(1), self.disA)
+    loss_G_GAN_A_2 = self.backward_G_GAN(self.fake_A_encoded[:,2,::].unsqueeze(1), self.disA)
+    loss_G_GAN_A = loss_G_GAN_A_0 + loss_G_GAN_A_1 + loss_G_GAN_A_2
+    loss_G_GAN_B_0 = self.backward_G_GAN(self.fake_B_encoded[:,0,::].unsqueeze(1), self.disB)
+    loss_G_GAN_B_1 = self.backward_G_GAN(self.fake_B_encoded[:,1,::].unsqueeze(1), self.disB)
+    loss_G_GAN_B_2 = self.backward_G_GAN(self.fake_B_encoded[:,2,::].unsqueeze(1), self.disB)
+    loss_G_GAN_B = loss_G_GAN_B_0 + loss_G_GAN_B_1 + loss_G_GAN_B_2
 
     # KL loss - z_a
     if self.concat:
@@ -338,17 +352,30 @@ class DRIT(nn.Module):
     loss_kl_zc_b = self._l2_regularize(self.z_content_b) * 0.01
 
     # cross cycle consistency loss
-    loss_G_L1_A = self.criterionL1(self.fake_A_recon, self.real_A_encoded) * 10
-    loss_G_L1_B = self.criterionL1(self.fake_B_recon, self.real_B_encoded) * 10
-    loss_G_L1_AA = self.criterionL1(self.fake_AA_encoded, self.real_A_encoded) * 10
-    loss_G_L1_BB = self.criterionL1(self.fake_BB_encoded, self.real_B_encoded) * 10
+    loss_G_L1_A_0 = self.criterionL1(self.fake_A_recon[:,0,::].unsqueeze(1), self.real_A_encoded[:,0,::].unsqueeze(1)) * 10
+    loss_G_L1_A_1 = self.criterionL1(self.fake_A_recon[:,1,::].unsqueeze(1), self.real_A_encoded[:,1,::].unsqueeze(1)) * 10
+    loss_G_L1_A_2 = self.criterionL1(self.fake_A_recon[:,2,::].unsqueeze(1), self.real_A_encoded[:,2,::].unsqueeze(1)) * 10
+    loss_G_L1_A = loss_G_L1_A_0 + loss_G_L1_A_1 + loss_G_L1_A_2
+    loss_G_L1_B_0 = self.criterionL1(self.fake_B_recon[:,0,::].unsqueeze(1), self.real_B_encoded[:,0,::].unsqueeze(1)) * 10
+    loss_G_L1_B_1 = self.criterionL1(self.fake_B_recon[:,1,::].unsqueeze(1), self.real_B_encoded[:,1,::].unsqueeze(1)) * 10
+    loss_G_L1_B_2 = self.criterionL1(self.fake_B_recon[:,2,::].unsqueeze(1), self.real_B_encoded[:,2,::].unsqueeze(1)) * 10
+    loss_G_L1_B = loss_G_L1_B_0 + loss_G_L1_B_1 + loss_G_L1_B_2
+
+    loss_G_L1_AA_0 = self.criterionL1(self.fake_AA_encoded[:,0,::].unsqueeze(1), self.real_A_encoded[:,0,::].unsqueeze(1)) * 10
+    loss_G_L1_AA_1 = self.criterionL1(self.fake_AA_encoded[:,1,::].unsqueeze(1), self.real_A_encoded[:,1,::].unsqueeze(1)) * 10
+    loss_G_L1_AA_2 = self.criterionL1(self.fake_AA_encoded[:,2,::].unsqueeze(1), self.real_A_encoded[:,2,::].unsqueeze(1)) * 10
+    loss_G_L1_AA = loss_G_L1_AA_0 + loss_G_L1_AA_1 + loss_G_L1_AA_2
+    loss_G_L1_BB_0 = self.criterionL1(self.fake_BB_encoded[:,0,::].unsqueeze(1), self.real_B_encoded[:,0,::].unsqueeze(1)) * 10
+    loss_G_L1_BB_1 = self.criterionL1(self.fake_BB_encoded[:,1,::].unsqueeze(1), self.real_B_encoded[:,1,::].unsqueeze(1)) * 10
+    loss_G_L1_BB_2 = self.criterionL1(self.fake_BB_encoded[:,2,::].unsqueeze(1), self.real_B_encoded[:,2,::].unsqueeze(1)) * 10
+    loss_G_L1_BB = loss_G_L1_BB_0 + loss_G_L1_BB_1 + loss_G_L1_BB_2
 
     loss_G = loss_G_GAN_A + loss_G_GAN_B + \
-             loss_G_GAN_Acontent + loss_G_GAN_Bcontent + \
-             loss_G_L1_AA + loss_G_L1_BB + \
-             loss_G_L1_A + loss_G_L1_B + \
-             loss_kl_zc_a + loss_kl_zc_b + \
-             loss_kl_za_a + loss_kl_za_b
+              loss_G_GAN_Acontent + loss_G_GAN_Bcontent + \
+              loss_G_L1_AA + loss_G_L1_BB + \
+              loss_G_L1_A + loss_G_L1_B + \
+              loss_kl_zc_a + loss_kl_zc_b + \
+              loss_kl_za_a + loss_kl_za_b
 
     loss_G.backward(retain_graph=True)
 
@@ -385,8 +412,12 @@ class DRIT(nn.Module):
 
   def backward_G_alone(self):
     # Ladv for generator
-    loss_G_GAN2_A = self.backward_G_GAN(self.fake_A_random, self.disA2)
-    loss_G_GAN2_B = self.backward_G_GAN(self.fake_B_random, self.disB2)
+    loss_G_GAN2_A = self.backward_G_GAN(self.fake_A_random[:,0,::].unsqueeze(1), self.disA2)+\
+                    self.backward_G_GAN(self.fake_A_random[:,1,::].unsqueeze(1), self.disA2)+\
+                    self.backward_G_GAN(self.fake_A_random[:,2,::].unsqueeze(1), self.disA2)
+    loss_G_GAN2_B = self.backward_G_GAN(self.fake_B_random[:,0,::].unsqueeze(1), self.disB2)+\
+                    self.backward_G_GAN(self.fake_B_random[:,1,::].unsqueeze(1), self.disB2)+\
+                    self.backward_G_GAN(self.fake_B_random[:,2,::].unsqueeze(1), self.disB2)
     if not self.no_ms:
       loss_G_GAN2_A2 = self.backward_G_GAN(self.fake_A_random2, self.disA2)
       loss_G_GAN2_B2 = self.backward_G_GAN(self.fake_B_random2, self.disB2)
