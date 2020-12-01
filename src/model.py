@@ -10,6 +10,7 @@ class DRIT(nn.Module):
     lr = 0.0001
     lr_dcontent = lr / 2.5
     self.nz = 8
+    self.opts = opts
     self.concat = opts.concat
     self.no_ms = opts.no_ms
 
@@ -437,7 +438,7 @@ class DRIT(nn.Module):
     return encoding_loss
 
   def resume(self, model_dir, train=True):
-    checkpoint = torch.load(model_dir)
+    checkpoint = torch.load(model_dir,map_location=lambda storage, loc: storage.cuda(self.opts.gpu))
     # weight
     if train:
       self.disA.load_state_dict(checkpoint['disA'])

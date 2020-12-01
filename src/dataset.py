@@ -5,6 +5,8 @@ from torchvision.transforms import Compose, Resize, RandomCrop, CenterCrop, Rand
 import random
 import ipdb
 
+from options import TestOptions
+
 class dataset_single(data.Dataset):
   def __init__(self, opts, setname, input_dim):
     self.dataroot = opts.dataroot
@@ -120,43 +122,43 @@ class dataset_unpair(data.Dataset):
     return self.dataset_size
 
 class dataset_pair(data.Dataset):
-  def __init__(self, opts, setname, input_dim):
-    self.dataroot = opts.dataroot
-    images = os.listdir(os.path.join(self.dataroot, opts.phase + setname))
-    self.img = [os.path.join(self.dataroot, opts.phase + setname, x) for x in images]
-    self.number = len(self.img)
-    self.input_dim = input_dim
+  def __init__(self, opts):
+    self.opts = opts
+    self.MR_files = os.listdir(os.path.join(self.opts.dataroot, self.opts.phase + 'A'))
+    self.CT_files = os.listdir(os.path.join(self.opts.dataroot, self.opts.phase + 'B'))
+    self.CT_size = len(self.CT_files)
+    self.MR_size = len(self.MR_files)
+    assert self.CT_size == self.MR_size
 
+    # setup image transformation
     transforms = []
     transforms.append(ToTensor())
     transforms.append(Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]))
     self.transforms = Compose(transforms)
-    print('%s: %d images'%(setname, self.number))
-    return
+    print('CT: %d, MR: %d images'%(self.CT_size, self.MR_size))
 
   def __getitem__(self, index):
-    input_name = self.img[index]
-    input = self.load_img(input_name, self.input_dim)
-    target_name = input_name.split('A')[0]+'B/CT'+input_name.split('T1')[-1]
-    target = self.load_img(target_name, self.input_dim)
-    return (input, target, input_name, target_name)
+    MR = self.load_img(os.path.join(self.opts.dataroot, self.opts.phase+'A', self.MR_files[index]))
+    CT_corresbonding_MR = 'CT'+self.MR_files[index].split('T1')[-1]
+    CT = self.load_img(os.path.join(self.opts.dataroot, self.opts.phase+'B', CT_corresbonding_MR))
+    return MR, CT
 
-  def load_img(self, img_name, input_dim):
+  def load_img(self, img_name):
     img = Image.open(img_name).convert('RGB')
     img = self.transforms(img)
     return img
 
   def __len__(self):
-    return self.number
+    return self.MR_size
 
 # call dataset
 if __name__ == "__main__":
 
     from options import TrainOptions
     # parse options
-    parser = TrainOptions()
+    parser = TestOptions()
     opts = parser.parse()
 
-    dataset = dataset_pair(opts, 'A', opts.input_dim_a)
+    dataset = dataset_pair(opts)
 
     print('done')

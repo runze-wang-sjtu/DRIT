@@ -12,6 +12,13 @@ def tensor2img(img):
   img = (np.transpose(img, (1, 2, 0)) + 1) / 2.0 * 255.0
   return img.astype(np.uint8)
 
+def array_image_resize_array(array, target):
+  img = Image.fromarray(array)
+  target_size = target.shape
+  img_resize = img.resize((target_size), Image.BICUBIC)
+  array = np.array(img_resize)
+  return array
+
 # save a set of images
 def save_imgs(imgs, names, path):
   if not os.path.exists(path):
