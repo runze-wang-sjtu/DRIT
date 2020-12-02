@@ -5,11 +5,11 @@ class TrainOptions():
     self.parser = argparse.ArgumentParser()
 
     # data loader related
-    self.parser.add_argument('--dataroot', type=str, required=True, help='path of data')
+    self.parser.add_argument('--dataroot', type=str, default='/media/gdp/date/runze/codes/DRIT/datasets/slice', help='path of data')
     self.parser.add_argument('--phase', type=str, default='train', help='phase for dataloading')
     self.parser.add_argument('--batch_size', type=int, default=2, help='batch size')
-    self.parser.add_argument('--resize_size', type=int, default=0, help='resized image size for training')
-    self.parser.add_argument('--crop_size', type=int, default=(140,180), help='cropped image size for training')
+    self.parser.add_argument('--resize_size', type=int, default=256, help='resized image size for training')
+    self.parser.add_argument('--crop_size', type=int, help='cropped image size for training')
     self.parser.add_argument('--input_dim_a', type=int, default=3, help='# of input channels for domain A')
     self.parser.add_argument('--input_dim_b', type=int, default=3, help='# of input channels for domain B')
     self.parser.add_argument('--nThreads', type=int, default=8, help='# of threads for data loader')
@@ -35,7 +35,7 @@ class TrainOptions():
     self.parser.add_argument('--n_ep_decay', type=int, default=600, help='epoch start decay learning rate, set -1 if no decay') # 200 * d_iter
     self.parser.add_argument('--resume', type=str, default=None, help='specified the dir of saved models for resume the training')
     self.parser.add_argument('--d_iter', type=int, default=3, help='# of iterations for updating content discriminator')
-    self.parser.add_argument('--gpu', type=int, default=0, help='gpu')
+    self.parser.add_argument('--gpu', type=int, default=1, help='gpu')
 
     # attention related
     self.parser.add_argument('--ratio', type=float, default=0.2, help='attention ratio')
@@ -55,7 +55,7 @@ class TestOptions():
     # data loader related
     self.parser.add_argument('--dataroot', type=str, required=True, help='path of data')
     self.parser.add_argument('--phase', type=str, default='test', help='phase for dataloading')
-    self.parser.add_argument('--resize_size', type=int, help='resized image size for training')
+    self.parser.add_argument('--resize_size', type=int, default=256, help='resized image size for training')
     self.parser.add_argument('--crop_size', type=int, help='cropped image size for training')
     self.parser.add_argument('--nThreads', type=int, default=4, help='for data loader')
     self.parser.add_argument('--input_dim_a', type=int, default=3, help='# of input channels for domain A')
@@ -63,14 +63,15 @@ class TestOptions():
     self.parser.add_argument('--a2b', type=int, default=1, help='translation direction, 1 for a2b, 0 for b2a')
 
     # ouptput related
-    self.parser.add_argument('--num', type=int, default=5, help='number of outputs per image')
+    self.parser.add_argument('--num', type=int, default=1, help='number of outputs per image')
     self.parser.add_argument('--name', type=str, default='trial', help='folder name to save outputs')
     self.parser.add_argument('--result_dir', type=str, default='../test_outputs', help='path for saving result images and models')
 
     # model related
     self.parser.add_argument('--concat', type=int, default=1, help='concatenate attribute features for translation, set 0 for using feature-wise transform')
     self.parser.add_argument('--no_ms', action='store_true', help='disable mode seeking regularization')
-    self.parser.add_argument('--resume', type=str, required=True, help='specified the dir of saved models for resume the training')
+    self.parser.add_argument('--resume', type=str, help='specified the dir of saved models for resume the training')
+    self.parser.add_argument('--resume_path', type=str, help='specified the dir of saved models for resume the training')
     self.parser.add_argument('--gpu', type=int, default=0, help='gpu')
 
     # attention related

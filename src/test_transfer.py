@@ -37,14 +37,14 @@ def main():
   print('\n--- testing ---')
   for idx1, img1_ in enumerate(loader):
     print('{}/{}'.format(idx1, len(loader)))
-    img1 = img1_[0].cuda()
+    img1 = img1_[0].cuda(opts.gpu)
     img_name = img1_[1][0].split('/')[-1].split('.')[0]
     imgs = [img1]
     names = ['input']
     for idx2, img2_ in enumerate(loader_attr):
       if img2_[1][0].split('/')[-1].split('_')[1] == img_name.split('_')[1]:
         print(img2_[1][0].split('/')[-1])
-        img2 = img2_[0].cuda()
+        img2 = img2_[0].cuda(opts.gpu)
         with torch.no_grad():
           if opts.a2b:
             img = model.test_forward_transfer(img1, img2, a2b=True)
@@ -54,7 +54,6 @@ def main():
         names.append('output_{}'.format(0))
         break
     save_imgs(imgs, names, os.path.join(result_dir, '{}'.format(img_name)))
-
 
 if __name__ == '__main__':
   main()

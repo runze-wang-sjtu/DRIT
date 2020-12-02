@@ -1,9 +1,14 @@
 import torch
+import wandb
+import numpy as np
+from PIL import Image
 from options import TrainOptions
-from dataset import dataset_unpair
+from dataset import dataset_unpair, dataset_pair
 from model import DRIT
-from saver import Saver
+from saver import Saver, tensor2img
+from evaluation import Metrics
 
+wandb.init(project="drit")
 
 def main():
     # parse options
@@ -11,10 +16,13 @@ def main():
     opts = parser.parse()
 
     # daita loader
-    print('\n--- load dataset ---')
-    dataset = dataset_unpair(opts)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=opts.batch_size, shuffle=True,
-                                               num_workers=opts.nThreads)
+    print('\n--- load training dataset ---')
+    train_dataset = dataset_unpair(opts)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True,
+                                                num_workers=opts.nThreads)
+    print('\n--- load validation dataset ---')
+    val_dataset = dataset_pair(opts, phase_name='test')
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, num_workers=opts.nThreads)
 
     # model
     print('\n--- load model ---')
@@ -33,14 +41,14 @@ def main():
     # saver for display and output
     saver = Saver(opts)
 
-    # train
-    print('\n--- train ---')
     max_it = 500000
     for ep in range(ep0, opts.n_ep):
+        # train
+        print('\n--- train ---')
+        model.train()
         for it, (images_a, images_b) in enumerate(train_loader):
             if images_a.size(0) != opts.batch_size or images_b.size(0) != opts.batch_size:
                 continue
-
             # input data
             images_a = images_a.cuda(opts.gpu).detach()
             images_b = images_b.cuda(opts.gpu).detach()
@@ -67,15 +75,35 @@ def main():
         # decay learning rate
         if opts.n_ep_decay > -1:
             model.update_lr()
-
         # save result image
         saver.write_img(ep, model)
-
         # Save network weights
         saver.write_model(ep, total_it, model)
 
-    return
+        # eval
+        print('\n--- eval ---')
+        metric = Metrics()
+        model.eval()
+        for idx, (img_a, img_b) in enumerate(val_loader):
+            MR = img_a.cuda(opts.gpu)
+            CT = img_b.cuda(opts.gpu)
+            with torch.no_grad():
+                CT_out = model.test_forward_transfer(MR, CT, a2b=True)
+            target_arr = tensor2img(CT)
+            target_img = Image.fromarray(target_arr).convert('L')
+            target = np.array(target_img)
+            output_arr = tensor2img(CT_out)
+            output_img = Image.fromarray(output_arr).convert('L')
+            output_resize = output_img.resize(target_img.size, Image.BICUBIC)
+            output = np.array(output_resize)
+            mae, mse, psnr, ssim = metric.compute(target, output)
+            print('{}/{}, mae:{}, psnr:{}, ssim:{}'.format(idx, len(val_loader),mae, psnr, ssim))
+            metric.update(mae, mse, psnr, ssim)
+        result = metric.mean()
+        wandb.log({'epoch': ep, 'mae': result.get('mae'), 'psnr': result.get('psnr'), 'ssim': result.get('ssim')})
 
+        print('epoch:{}, mae:{}, psnr:{}, ssim:{}'.
+                format(ep, result.get('mae'), result.get('psnr'), result.get('ssim')))
 
 if __name__ == '__main__':
     main()
