@@ -45,7 +45,7 @@ class dataset_single(data.Dataset):
 class dataset_unpair(data.Dataset):
   def __init__(self, opts):
     self.dataroot = opts.dataroot
-
+    self.phase = opts.phase
     # A
     images_A = os.listdir(os.path.join(self.dataroot, opts.phase + 'A'))
     self.A = [os.path.join(self.dataroot, opts.phase + 'A', x) for x in images_A]
@@ -78,7 +78,10 @@ class dataset_unpair(data.Dataset):
     B_slice_index = self.slice_select(A_case_index, B_case_index, A_slice_index)
     PBS_B = self.B[index].split('_')[0]+'_'+self.B[index].split('_')[1]+'_'+str(B_slice_index)+'.jpg'
     data_B = self.load_img(PBS_B, self.input_dim_B)
-    return data_A, data_B
+    if self.phase == 'train':
+      return data_A, data_B
+    if self.phase == 'test':
+      return (data_A, self.A[index]), (data_B, self.B[index])
   
   def slice_select(self, A_case_index, B_case_index, slice_index):
     k_mri, k_ct = len(self.A_dict[A_case_index]), len(self.B_dict[B_case_index])
@@ -100,7 +103,7 @@ class dataset_unpair(data.Dataset):
     
     return slice_dict
           
-  def load_img(self, img_name, input_dim):
+  def load_img(self, img_name):
     img = Image.open(img_name).convert('RGB')
     img = self.transforms(img)
     return img
