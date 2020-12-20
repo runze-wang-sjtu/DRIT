@@ -50,14 +50,16 @@ class Saver():
         self.writer.add_scalar(m, getattr(model, m), total_it)
 
   # save result images
-  def write_img(self, ep, model):
-    if (ep + 1) % self.img_save_freq == 0:
+  def write_img(self, iter, model):
+    if (iter + 1) % self.img_save_freq == 0:
+      print('Saving result images')
       assembled_images = model.assemble_outputs()
-      img_filename = '%s/gen_%05d.jpg' % (self.image_dir, ep)
+      img_filename = '{}/gen_{}.jpg'.format(self.image_dir, iter)
       torchvision.utils.save_image(assembled_images / 2 + 0.5, img_filename, nrow=1)
-    elif ep == -1:
+    elif iter == -1:
+      print('Saving result images')
       assembled_images = model.assemble_outputs()
-      img_filename = '%s/gen_last.jpg' % (self.image_dir, ep)
+      img_filename = '%s/gen_last.jpg' % (self.image_dir, iter)
       torchvision.utils.save_image(assembled_images / 2 + 0.5, img_filename, nrow=1)
 
   # save model

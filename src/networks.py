@@ -12,9 +12,9 @@ class Dis_content(nn.Module):
   def __init__(self):
     super(Dis_content, self).__init__()
     model = []
-    model += [LeakyReLUConv2d(256, 256, kernel_size=7, stride=2, padding=1, norm='Instance')]
-    model += [LeakyReLUConv2d(256, 256, kernel_size=7, stride=2, padding=1, norm='Instance')]
-    model += [LeakyReLUConv2d(256, 256, kernel_size=7, stride=2, padding=1, norm='Instance')]
+    model += [LeakyReLUConv2d(256, 256, kernel_size=7, stride=2, padding=3, norm='Instance')]
+    model += [LeakyReLUConv2d(256, 256, kernel_size=7, stride=2, padding=3, norm='Instance')]
+    model += [LeakyReLUConv2d(256, 256, kernel_size=7, stride=2, padding=3, norm='Instance')]
     model += [LeakyReLUConv2d(256, 256, kernel_size=4, stride=1, padding=0)]
     model += [nn.Conv2d(256, 1, kernel_size=1, stride=1, padding=0)]
     self.model = nn.Sequential(*model)
