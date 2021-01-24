@@ -1,4 +1,5 @@
 import torch
+import wandb
 from options import TrainOptions
 from dataset import dataset_unpair
 from model import DRIT
@@ -6,7 +7,9 @@ from saver import Saver
 
 
 def main():
-    # parse options
+
+    wandb.init(project="heart-segmentation")    # parse options
+
     parser = TrainOptions()
     opts = parser.parse()
 
@@ -14,7 +17,7 @@ def main():
     print('\n--- load dataset ---')
     dataset = dataset_unpair(opts)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=opts.batch_size, shuffle=True,
-                                            num_workers=opts.nThreads)
+                                               num_workers=opts.nThreads)
 
     # model
     print('\n--- load model ---')
@@ -36,47 +39,63 @@ def main():
     # train
     print('\n--- train ---')
     max_it = 500000
-    slice_every_case = 200
     for ep in range(ep0, opts.n_ep):
-        it = 0
-        for i in range(slice_every_case):
-            for _, (images_a, images_b) in enumerate(train_loader):
-                it = it + 1
-                if images_a.size(0) != opts.batch_size or images_b.size(0) != opts.batch_size:
-                    continue
+        for it, (images_a, labels_a, images_b, labels_b) in enumerate(train_loader):
+            if images_a.size(0) != opts.batch_size or images_b.size(0) != opts.batch_size:
+                continue
 
-                # input data
-                images_a = images_a.cuda(opts.gpu).detach()
-                images_b = images_b.cuda(opts.gpu).detach()
+            # input data
+            images_a = images_a.cuda(opts.gpu).detach()
+            images_b = images_b.cuda(opts.gpu).detach()
+            labels_a = labels_a.cuda(opts.gpu).detach()
+            labels_b = labels_b.cuda(opts.gpu).detach()
 
-                # update model
-                if (it + 1) % opts.d_iter != 0:
+            # update model
+            if ep < opts.n_ep_before_seg:
+                if (it + 1) % opts.d_iter != 0 and it < len(train_loader) - 2:
                     model.update_D_content(images_a, images_b)
                     continue
                 else:
                     model.update_D(images_a, images_b)
                     model.update_EG()
+            else:
+                if (it + 1) % opts.d_iter != 0 and it < len(train_loader) - 2:
+                    model.update_D_content(images_a, images_b)
+                    continue
+                else:
+                    model.update_D(images_a, images_b)
+                    model.update_EG()
+                    seg_loss, train_dice = model.update_Seg(labels_a, labels_b)
+                    wandb.log(seg_loss)
+                    wandb.log(train_dice)
 
-                # save result image
-                saver.write_img(total_it, model)
 
-                # save to display file
-                if not opts.no_display_img:
-                    saver.write_display(total_it, model)
+            # debug write_img
+            # saver.write_img(ep, model)
 
-                print('total_it: %d (ep %d, it %d), lr %08f' % (total_it, ep, it, model.gen_opt.param_groups[0]['lr']))
-                total_it += 1
-                if total_it >= max_it:
-                    saver.write_img(-1, model)
-                    saver.write_model(-1, model)
-                    break
+            # save to display file
+            if not opts.no_display_img:
+                saver.write_display(total_it, model)
+
+            print('total_it: %d (ep %d, it %d), lr %08f' % (total_it, ep, it, model.gen_opt.param_groups[0]['lr']))
+            total_it += 1
+            if total_it >= max_it:
+                saver.write_img(-1, model)
+                saver.write_model(-1, model)
+                break
 
         # decay learning rate
         if opts.n_ep_decay > -1:
             model.update_lr()
 
-        # Save network weights
+        # # save result image
+        saver.write_img(ep, model)
+
+        # # Save network weights
         saver.write_model(ep, total_it, model)
+
+    return
+
 
 if __name__ == '__main__':
     main()

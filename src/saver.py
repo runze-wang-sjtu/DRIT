@@ -48,18 +48,19 @@ class Saver():
       members = [attr for attr in dir(model) if not callable(getattr(model, attr)) and not attr.startswith("__") and 'loss' in attr]
       for m in members:
         self.writer.add_scalar(m, getattr(model, m), total_it)
+      # write img
+      # image_dis = torchvision.utils.make_grid(model.image_display, nrow=model.image_display.size(0)//2)/2 + 0.5
+      # self.writer.add_image('Image', image_dis, total_it)
 
   # save result images
-  def write_img(self, iter, model):
-    if (iter + 1) % self.img_save_freq == 0:
-      print('Saving result images')
+  def write_img(self, ep, model):
+    if (ep + 1) % self.img_save_freq == 0:
       assembled_images = model.assemble_outputs()
-      img_filename = '{}/gen_{}.jpg'.format(self.image_dir, iter)
+      img_filename = '%s/gen_%05d.jpg' % (self.image_dir, ep)
       torchvision.utils.save_image(assembled_images / 2 + 0.5, img_filename, nrow=1)
-    elif iter == -1:
-      print('Saving result images')
+    elif ep == -1:
       assembled_images = model.assemble_outputs()
-      img_filename = '%s/gen_last.jpg' % (self.image_dir, iter)
+      img_filename = '%s/gen_last.jpg' % (self.image_dir, ep)
       torchvision.utils.save_image(assembled_images / 2 + 0.5, img_filename, nrow=1)
 
   # save model
