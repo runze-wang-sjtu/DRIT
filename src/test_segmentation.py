@@ -11,11 +11,11 @@ from saver import save_imgs
 from metric import Metrics
 from PIL import Image
 
-def translation(x, h, w):
+def translation(x, h, w, opts):
     x_local = x.squeeze().cpu().numpy()
     x_Image = Image.fromarray(x_local.astype('uint8'))
     x_resize = np.array(x_Image.resize((w, h), Image.NEAREST))
-    x_cuda = torch.from_numpy(x_resize).unsqueeze(0).cuda()
+    x_cuda = torch.from_numpy(x_resize).unsqueeze(0).cuda(opts.gpu)
     return x_cuda
 
 def main():
@@ -25,9 +25,9 @@ def main():
 
     # data loader
     print('\n--- load dataset ---')
-    dataset_A = dataset_segmentation(opts, setname='A')
+    dataset_A = dataset_segmentation(opts, phase='test', setname='A')
     loader_A = torch.utils.data.DataLoader(dataset_A, batch_size=1, num_workers=opts.nThreads)
-    dataset_B = dataset_segmentation(opts, setname='B')
+    dataset_B = dataset_segmentation(opts, phase='test', setname='B')
     loader_B = torch.utils.data.DataLoader(dataset_B, batch_size=1, num_workers=opts.nThreads)
 
     # model
@@ -46,12 +46,21 @@ def main():
     print('\n--- testing B ---')
     metric_setup = Metrics()
     for index, (image, label, names) in enumerate(loader_B):
-        image, label, label_name = image.cuda(), label.cuda(), names[1]
+        image, label, label_name = image.cuda(opts.gpu), label.cuda(opts.gpu), names[1][0]
         with torch.no_grad():
             predict = model.segmentor.forward_b(image)
         predict_mask = model.predict_mask(predict)
         _, h, w = label.shape
-        predict_mask = translation(predict_mask, h, w)
+        predict_mask = translation(predict_mask, h, w, opts)
+
+        colorize_predict= Image.fromarray((model.colorize(predict_mask) / 2 + 0.5). \
+            mul_(255).add_(0.5).clamp_(0, 255).squeeze().permute(1, 2, 0).to('cpu', torch.uint8).numpy())
+        colorize_label = Image.fromarray((model.colorize(label) / 2 + 0.5). \
+            mul_(255).add_(0.5).clamp_(0, 255).squeeze().permute(1, 2, 0).to('cpu', torch.uint8).numpy())
+        predict_name = label_name.split('lable')[0]+'predict'+label_name.split('label')[-1]
+        colorize_label.save(os.path.join(result_dir, label_name))
+        colorize_predict.save(os.path.join(result_dir, predict_name))
+
         one_hot_label = model.one_hot_coding(label)
         ont_hot_predict = model.one_hot_coding(predict_mask)
         diceB = metric_setup.dice_coef_multilabel(one_hot_label, ont_hot_predict, opts.n_classes)
@@ -63,12 +72,21 @@ def main():
     print('\n--- testing A ---')
     metric_setup = Metrics()
     for index, (image, label, names) in enumerate(loader_A):
-        image, label, label_name = image.cuda(), label.cuda(), names[1]
+        image, label, label_name = image.cuda(opts.gpu), label.cuda(opts.gpu), names[1][0]
         with torch.no_grad():
             predict = model.segmentor.forward_a(image)
         predict_mask = model.predict_mask(predict)
         _, h, w = label.shape
-        predict_mask = translation(predict_mask, h, w)
+        predict_mask = translation(predict_mask, h, w, opts)
+
+        colorize_predict= Image.fromarray((model.colorize(predict_mask) / 2 + 0.5). \
+                                          mul_(255).add_(0.5).clamp_(0, 255).squeeze().permute(1, 2, 0).to('cpu', torch.uint8).numpy())
+        colorize_label = Image.fromarray((model.colorize(label) / 2 + 0.5). \
+                                         mul_(255).add_(0.5).clamp_(0, 255).squeeze().permute(1, 2, 0).to('cpu', torch.uint8).numpy())
+        predict_name = label_name.split('lable')[0]+'predict'+label_name.split('label')[-1]
+        colorize_label.save(os.path.join(result_dir, label_name))
+        colorize_predict.save(os.path.join(result_dir, predict_name))
+
         one_hot_label = model.one_hot_coding(label)
         one_hot_predict = model.one_hot_coding(predict_mask)
         diceA = metric_setup.dice_coef_multilabel(one_hot_label, one_hot_predict, opts.n_classes)

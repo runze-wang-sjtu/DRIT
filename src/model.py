@@ -5,6 +5,7 @@ import numpy as np
 from metric import Metrics
 from segmentor.unet_model import UNet
 from segmentor.pspnet import PSPNet
+from segmentor.dice_loss import dice_loss
 
 
 class DRIT(nn.Module):
@@ -54,7 +55,7 @@ class DRIT(nn.Module):
 
         # segmentor
         if self.opts.segmentor == 'UNet':
-            self.segmentor= UNet(n_channels=opts.input_dim_a, n_classes=opts.n_classes, bilinear=True)
+            self.segmentor = UNet(n_channels=opts.input_dim_a, n_classes=opts.n_classes, bilinear=True)
             self.segmentor_opt = torch.optim.RMSprop(self.segmentor.parameters(), lr=opts.segmentor_lr,
                                                      weight_decay=1e-8, momentum=0.9)
         elif self.opts.segmentor == 'PSPNet':
@@ -75,9 +76,10 @@ class DRIT(nn.Module):
         # Setup the loss function for training
         self.criterionL1 = torch.nn.L1Loss()
         if opts.n_classes > 1:
-            self.criterion_segmentor = nn.CrossEntropyLoss()
+            self.criterion_CE = nn.CrossEntropyLoss()
+            # self.criterion_dice = dice_loss()
         else:
-            self.criterion_segmentor = nn.BCEWithLogitsLoss()
+            self.criterion_CE = nn.BCEWithLogitsLoss()
 
     def initialize(self):
         self.disA.apply(networks.gaussian_weights_init)
@@ -208,15 +210,6 @@ class DRIT(nn.Module):
             self.fake_B_encoded, self.fake_BB_encoded, self.fake_B_random = torch.split(output_fakeB,
                                                                                         self.z_content_a.size(0), dim=0)
 
-        # get segmentation results
-        self.seg_real_A = self.segmentor.forward_a(self.real_A_encoded)
-        self.seg_fake_B = self.segmentor.forward_b(self.fake_B_encoded)
-        self.seg_fake_B_random = self.segmentor.forward_b(self.fake_B_random)
-
-        self.seg_real_B = self.segmentor.forward_b(self.real_B_encoded)
-        self.seg_fake_A = self.segmentor.forward_a(self.fake_A_encoded)
-        self.seg_fake_A_random = self.segmentor.forward_a(self.fake_A_random)
-
         # get reconstructed encoded z_c
         # fake_a_encoded--->z_content_b, fake_b_encoded--->z_content_a
         self.z_content_recon_b, self.z_content_recon_a = self.enc_c.forward(self.fake_A_encoded, self.fake_B_encoded)
@@ -238,6 +231,19 @@ class DRIT(nn.Module):
         # z_content_recon_a torch.Size([1, 256, 54, 54]) z_attr_recon_a torch.Size([1, 8]) fake_A_recon torch.Size([1, 3, 216, 216])
         self.fake_A_recon = self.gen.forward_a(self.z_content_recon_a, self.z_attr_recon_a)
         self.fake_B_recon = self.gen.forward_b(self.z_content_recon_b, self.z_attr_recon_b)
+
+        # get segmentation results
+        self.seg_real_A = self.segmentor.forward_a(self.real_A_encoded)
+        self.seg_fake_B = self.segmentor.forward_b(self.fake_B_encoded)
+        self.seg_fake_B_random = self.segmentor.forward_b(self.fake_B_random)
+        self.seg_fake_AA = self.segmentor.forward_a(self.fake_AA_encoded)
+        self.seg_fake_A_recon = self.segmentor.forward_a(self.fake_A_recon)
+
+        self.seg_real_B = self.segmentor.forward_b(self.real_B_encoded)
+        self.seg_fake_A = self.segmentor.forward_a(self.fake_A_encoded)
+        self.seg_fake_A_random = self.segmentor.forward_a(self.fake_A_random)
+        self.seg_fake_BB = self.segmentor.forward_b(self.fake_BB_encoded)
+        self.seg_fake_B_recon = self.segmentor.forward_b(self.fake_B_recon)
 
         # for display
         self.image_display = torch.cat(
@@ -479,65 +485,90 @@ class DRIT(nn.Module):
         self.lab_real_A = labels_a[0:half_size]
         self.lab_real_B = labels_b[0:half_size]
 
-        loss_real_B = self.criterion_segmentor(self.seg_real_B, self.lab_real_B)
-        loss_fake_A = self.criterion_segmentor(self.seg_fake_A, self.lab_real_B)
-        loss_fake_A_random = self.criterion_segmentor(self.seg_fake_A_random, self.lab_real_B)
+        loss_real_B = self.criterion_CE(self.seg_real_B, self.lab_real_B) + \
+                      dice_loss(self.seg_real_B, self.one_hot_coding(self.lab_real_B))
+        loss_fake_A = self.criterion_CE(self.seg_fake_A, self.lab_real_B) + \
+                      dice_loss(self.seg_fake_A, self.one_hot_coding(self.lab_real_B))
+        loss_fake_A_random = self.criterion_CE(self.seg_fake_A_random, self.lab_real_B) + \
+                             dice_loss(self.seg_fake_A_random, self.one_hot_coding(self.lab_real_B))
+        loss_fake_BB = self.criterion_CE(self.seg_fake_BB, self.lab_real_B) + \
+                       dice_loss(self.seg_fake_BB, self.one_hot_coding(self.lab_real_B))
+        loss_fake_B_recon = self.criterion_CE(self.seg_fake_B_recon, self.lab_real_B) + \
+                            dice_loss(self.seg_fake_B_recon, self.one_hot_coding(self.lab_real_B))
 
         b, _, h, w = self.seg_fake_B.size()
         pseudo_target = self.predict_mask(self.seg_fake_B)
 
-        loss_real_A = self.criterion_segmentor(self.seg_real_A, pseudo_target)
+        loss_real_A = self.criterion_CE(self.seg_real_A, pseudo_target) + \
+                      dice_loss(self.seg_real_A, self.one_hot_coding(pseudo_target))
+        loss_fake_AA = self.criterion_CE(self.seg_fake_AA, pseudo_target) + \
+                       dice_loss(self.seg_fake_AA, self.one_hot_coding(pseudo_target))
+        loss_fake_A_recon = self.criterion_CE(self.seg_fake_A_recon, pseudo_target) + \
+                            dice_loss(self.seg_fake_A_recon, self.one_hot_coding(pseudo_target))
 
-        loss_seg = loss_real_B + loss_fake_A + loss_fake_A_random + loss_real_A
+        loss_seg = loss_real_B + loss_fake_A + loss_fake_A_random + loss_real_A + \
+                   loss_fake_BB + loss_fake_B_recon + loss_fake_AA + loss_fake_A_recon
 
         self.segmentor_opt.zero_grad()
         loss_seg.backward()
         self.segmentor_opt.step()
 
-        keys = ['Loss_real_B', 'loss_fake_A', 'loss_fake_A_random', 'loss_real_A']
-        vals = [loss_real_B, loss_fake_A, loss_fake_A_random, loss_real_A]
+        keys = ['Loss_real_B', 'loss_fake_A', 'loss_fake_A_random', 'loss_fake_BB ', 'loss_fake_B_recon ',
+                'loss_real_A', 'loss_fake_AA', 'loss_fake_A_recon']
+        vals = [loss_real_B, loss_fake_A, loss_fake_A_random, loss_fake_BB, loss_fake_B_recon, loss_real_A,
+                loss_fake_AA, loss_fake_A_recon]
         loss = dict(zip(keys, vals))
 
         self.predict_real_B = self.predict_mask(self.seg_real_B)
         self.predict_fake_A = self.predict_mask(self.seg_fake_A)
         self.predict_fake_A_random = self.predict_mask(self.seg_fake_A_random)
+        self.predict_fake_BB = self.predict_mask(self.seg_fake_BB)
+        self.predict_fake_B_recon = self.predict_mask(self.seg_fake_B_recon)
+
         self.predict_real_A = self.predict_mask(self.seg_real_A)
         self.predict_fake_B = self.predict_mask(self.seg_fake_B)
         self.predict_fake_B_random = self.predict_mask(self.seg_fake_B_random)
+        self.predict_fake_AA = self.predict_mask(self.seg_fake_AA)
+        self.predict_fake_A_recon = self.predict_mask(self.seg_fake_A_recon)
 
-        ohot_gt_B = self.one_hot_coding(self.lab_real_B)
-        ohot_real_B = self.one_hot_coding(self.predict_real_B)
-        ohot_fake_A = self.one_hot_coding(self.predict_fake_A)
-        ohot_fake_A_random = self.one_hot_coding(self.predict_fake_A_random)
+        # ohot_gt_B = self.one_hot_coding(self.lab_real_B)
+        # ohot_real_B = self.one_hot_coding(self.predict_real_B)
+        # ohot_fake_A = self.one_hot_coding(self.predict_fake_A)
+        # ohot_fake_A_random = self.one_hot_coding(self.predict_fake_A_random)
+        #
+        # ohot_gt_A = self.one_hot_coding(self.lab_real_A)
+        # ohot_real_A = self.one_hot_coding(self.predict_real_A)
+        # ohot_fake_B = self.one_hot_coding(self.predict_fake_B)
+        # ohot_fake_B_random = self.one_hot_coding(self.predict_fake_B_random)
+        #
+        # _, _, _, _, dice_real_B = self.metric.dice_coef_multilabel(ohot_gt_B, ohot_real_B, self.opts.n_classes)
+        # _, _, _, _, dice_fake_A = self.metric.dice_coef_multilabel(ohot_gt_B, ohot_fake_A, self.opts.n_classes)
+        # _, _, _, _, dice_fake_A_random = self.metric.dice_coef_multilabel(ohot_gt_B, ohot_fake_A_random,
+        #                                                                   self.opts.n_classes)
+        # _, _, _, _, dice_real_A = self.metric.dice_coef_multilabel(ohot_gt_A, ohot_real_A, self.opts.n_classes)
+        # _, _, _, _, dice_fake_B = self.metric.dice_coef_multilabel(ohot_gt_A, ohot_fake_B, self.opts.n_classes)
+        # _, _, _, _, dice_fake_B_random = self.metric.dice_coef_multilabel(ohot_gt_A, ohot_fake_B_random,
+        #                                                                   self.opts.n_classes)
+        #
+        # keys_plan = ['dice_real_B', 'dice_fake_A', 'dice_fake_A_random', 'dice_real_A', 'dice_fake_B',
+        #              'dice_fake_B_random']
+        # vals_plan = [dice_real_B, dice_fake_A, dice_fake_A_random, dice_real_A, dice_fake_B, dice_fake_B_random]
+        # dice = dict(zip(keys_plan, vals_plan))
 
-        ohot_gt_A = self.one_hot_coding(self.lab_real_A)
-        ohot_real_A = self.one_hot_coding(self.predict_real_A)
-        ohot_fake_B = self.one_hot_coding(self.predict_fake_B)
-        ohot_fake_B_random = self.one_hot_coding(self.predict_fake_B_random)
+        # return loss, dice
+        return loss
 
-        dice_real_B = self.metric.dice_coef_multilabel(ohot_gt_B, ohot_real_B, self.opts.n_classes)
-        dice_fake_A = self.metric.dice_coef_multilabel(ohot_gt_B, ohot_fake_A, self.opts.n_classes)
-        dice_fake_A_random = self.metric.dice_coef_multilabel(ohot_gt_B, ohot_fake_A_random, self.opts.n_classes)
-        dice_real_A = self.metric.dice_coef_multilabel(ohot_gt_A, ohot_real_A, self.opts.n_classes)
-        dice_fake_B = self.metric.dice_coef_multilabel(ohot_gt_A, ohot_fake_B, self.opts.n_classes)
-        dice_fake_B_random = self.metric.dice_coef_multilabel(ohot_gt_A, ohot_fake_B_random, self.opts.n_classes)
-
-        keys_plan = ['dice_real_B', 'dice_fake_A', 'dice_fake_A_random', 'dice_real_A', 'dice_fake_B', 'dice_fake_B_random']
-        vals_plan = [dice_real_B, dice_fake_A, dice_fake_A_random, dice_real_A, dice_fake_B, dice_fake_B_random]
-        dice = dict(zip(keys_plan, vals_plan))
-
-        return loss, dice
-
-    def one_hot_coding(self, x):
+    def one_hot_coding(self, x, cuda=True):
 
         x_array = x.detach().cpu().numpy()
         b, h, w = x_array.shape
         y = np.zeros([b, self.opts.n_classes, h, w])
         for c in range(self.opts.n_classes):
             y[:, c, ::][x_array == c] = 1
+        if cuda:
+            y = torch.from_numpy(y).float().cuda(self.opts.gpu)
 
         return y
-
 
     def predict_mask(self, predict):
         b, _, h, w = predict.size()
@@ -558,7 +589,7 @@ class DRIT(nn.Module):
             mask_b = torch.zeros(1, h, w).cuda(self.opts.gpu)
             mask_b[mask == k] = v[2]
             mask_rgb.add_(torch.cat((mask_r.unsqueeze(0), mask_g.unsqueeze(0), mask_b.unsqueeze(0)), 1))
-        return mask_rgb.float().div(255./2).sub(1)
+        return mask_rgb.float().div(255. / 2).sub(1)
 
     def update_lr(self):
         self.disA_sch.step()
@@ -628,7 +659,24 @@ class DRIT(nn.Module):
         torch.save(state, filename)
         return
 
-    def assemble_outputs(self):
+    def assemble_outputs_without_segmentation(self):
+        images_a = self.normalize_image(self.real_A_encoded).detach()
+        images_b = self.normalize_image(self.real_B_encoded).detach()
+        images_a1 = self.normalize_image(self.fake_A_encoded).detach()
+        images_a2 = self.normalize_image(self.fake_A_random).detach()
+        images_a3 = self.normalize_image(self.fake_A_recon).detach()
+        images_a4 = self.normalize_image(self.fake_AA_encoded).detach()
+        images_b1 = self.normalize_image(self.fake_B_encoded).detach()
+        images_b2 = self.normalize_image(self.fake_B_random).detach()
+        images_b3 = self.normalize_image(self.fake_B_recon).detach()
+        images_b4 = self.normalize_image(self.fake_BB_encoded).detach()
+        row1 = torch.cat(
+            (images_a[0:1, ::], images_b1[0:1, ::], images_b2[0:1, ::], images_a4[0:1, ::], images_a3[0:1, ::]), 3)
+        row2 = torch.cat(
+            (images_b[0:1, ::], images_a1[0:1, ::], images_a2[0:1, ::], images_b4[0:1, ::], images_b3[0:1, ::]), 3)
+        return torch.cat((row1, row2), 2)
+
+    def assemble_outputs_with_segmentation(self):
         images_a = self.normalize_image(self.real_A_encoded).detach()
         images_b = self.normalize_image(self.real_B_encoded).detach()
         images_a1 = self.normalize_image(self.fake_A_encoded).detach()
@@ -646,21 +694,28 @@ class DRIT(nn.Module):
         map_A = self.colorize(self.predict_real_A).detach()
         map_fake_A = self.colorize(self.predict_fake_A).detach()
         map_fake_A_random = self.colorize(self.predict_fake_A_random).detach()
+        map_fake_AA = self.colorize(self.predict_fake_AA).detach()
+        map_fake_A_recon = self.colorize(self.predict_fake_A_recon).detach()
 
         gt_B = self.colorize(self.lab_real_B).detach()
         map_B = self.colorize(self.predict_real_B).detach()
         map_fake_B = self.colorize(self.predict_fake_B).detach()
         map_fake_B_random = self.colorize(self.predict_fake_B_random).detach()
-
+        map_fake_BB = self.colorize(self.predict_fake_BB).detach()
+        map_fake_B_recon = self.colorize(self.predict_fake_B_recon).detach()
 
         row1 = torch.cat(
-            (images_a[0:1, ::], images_b1[0:1, ::], images_b2[0:1, ::], images_a4[0:1, ::], images_a3[0:1, ::]), 3)
+            (blank, images_a[0:1, ::], images_b1[0:1, ::], images_b2[0:1, ::], images_a4[0:1, ::], images_a3[0:1, ::]),
+            3)
         row2 = torch.cat(
-            (map_A[0:1, ::], map_fake_B[0:1, ::], map_fake_B_random[0:1, ::], blank[0:1, ::], gt_A[0:11, ::]), 3)
+            (gt_A[0:11, ::], map_A[0:1, ::], map_fake_B[0:1, ::], map_fake_B_random[0:1, ::], map_fake_AA[0:1, ::],
+             map_fake_A_recon[0:1, ::]), 3)
         row3 = torch.cat(
-            (images_b[0:1, ::], images_a1[0:1, ::], images_a2[0:1, ::], images_b4[0:1, ::], images_b3[0:1, ::]), 3)
+            (blank, images_b[0:1, ::], images_a1[0:1, ::], images_a2[0:1, ::], images_b4[0:1, ::], images_b3[0:1, ::]),
+            3)
         row4 = torch.cat(
-            (map_B[0:1, ::], map_fake_A[0:1, ::], map_fake_A_random[0:1, ::], blank[0:1, ::], gt_B[0:1, ::]), 3)
+            (gt_B[0:1, ::], map_B[0:1, ::], map_fake_A[0:1, ::], map_fake_A_random[0:1, ::], map_fake_BB[0:1, ::],
+             map_fake_B_recon[0:1, ::]), 3)
         return torch.cat((row1, row2, row3, row4), 2)
 
     def normalize_image(self, x):
