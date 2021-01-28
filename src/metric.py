@@ -10,7 +10,7 @@ class Metrics(object):
     def __init__(self):
 
         self.update_num = 0
-        self.metric = {'dice_0': 0, 'dice_1': 0, 'dice_2': 0, 'dice_3': 0, 'dice': 0}
+        self.metric = {'dice_0': 0, 'dice_1': 0, 'dice_2': 0, 'dice': 0}
 
     def dice_coef(self, true, pred):
 
@@ -31,20 +31,20 @@ class Metrics(object):
                 self.dice_1 = self.dice_coef(true[:, index, ::], pred[:, index, ::])
             elif index == 2:
                 self.dice_2 = self.dice_coef(true[:, index, ::], pred[:, index, ::])
-            elif index == 3:
-                self.dice_3 = self.dice_coef(true[:, index, ::], pred[:, index, ::])
+            # elif index == 3:
+            #     self.dice_3 = self.dice_coef(true[:, index, ::], pred[:, index, ::])
             dice += self.dice_coef(true[:, index, ::], pred[:, index, ::])
 
         self.dice_multilabel = dice / numlabels
 
-        return self.dice_0, self.dice_1, self.dice_2, self.dice_3, self.dice_multilabel
+        return self.dice_0, self.dice_1, self.dice_2, self.dice_multilabel
 
     def update(self):
 
         self.metric['dice_0'] += self.dice_0
         self.metric['dice_1'] += self.dice_1
         self.metric['dice_2'] += self.dice_2
-        self.metric['dice_3'] += self.dice_3
+        # self.metric['dice_3'] += self.dice_3
         self.metric['dice'] += self.dice_multilabel
         self.update_num += 1
 
@@ -53,7 +53,7 @@ class Metrics(object):
         self.metric['dice_0'] = self.metric['dice_0'] / self.update_num
         self.metric['dice_1'] = self.metric['dice_1'] / self.update_num
         self.metric['dice_2'] = self.metric['dice_2'] / self.update_num
-        self.metric['dice_3'] = self.metric['dice_3'] / self.update_num
+        # self.metric['dice_3'] = self.metric['dice_3'] / self.update_num
         self.metric['dice'] = self.metric['dice'] / self.update_num
 
         return self.metric

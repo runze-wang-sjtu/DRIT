@@ -129,7 +129,7 @@ def main():
             metric_B['diceB_0'] = metric_B.pop('dice_0')
             metric_B['diceB_1'] = metric_B.pop('dice_1')
             metric_B['diceB_2'] = metric_B.pop('dice_2')
-            metric_B['diceB_3'] = metric_B.pop('dice_3')
+            # metric_B['diceB_3'] = metric_B.pop('dice_3')
             metric_B['diceB'] = metric_B.pop('dice')
 
             print('\n--- testing A ---')
@@ -149,7 +149,7 @@ def main():
             metric_A['diceA_0'] = metric_A.pop('dice_0')
             metric_A['diceA_1'] = metric_A.pop('dice_1')
             metric_A['diceA_2'] = metric_A.pop('dice_2')
-            metric_A['diceA_3'] = metric_A.pop('dice_3')
+            # metric_A['diceA_3'] = metric_A.pop('dice_3')
             metric_A['diceA'] = metric_A.pop('dice')
 
             wandb.log(metric_B)

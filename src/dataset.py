@@ -28,9 +28,9 @@ class dataset_segmentation(data.Dataset):
         image_path_name = self.img[index]
         image_name = os.path.split(self.img[index])[-1]
         if self.setname == 'A':
-            label_name = 'T2_label' + image_name.split('image')[-1]
+            label_name = 'mr_label' + image_name.split('image')[-1]
         elif self.setname == 'B':
-            label_name = 'C0_label' + image_name.split('image')[-1]
+            label_name = 'ct_label' + image_name.split('image')[-1]
         label_path_name = os.path.join(self.dataroot, self.phase + self.setname + '_label', label_name)
 
         image, label = self.load(image_path_name, label_path_name)
@@ -57,18 +57,18 @@ class dataset_unpair(data.Dataset):
     def __init__(self, opts):
         self.opts = opts
         self.dataroot = opts.dataroot
-        self.mask_code = {0: 0, 60: 1, 120: 2, 180: 3}
+        self.mask_code = {0: 0, 60: 1, 120: 2}
 
         # A
         images_A = os.listdir(os.path.join(self.dataroot, opts.phase + 'A'))
         self.A = [os.path.join(self.dataroot, opts.phase + 'A', x) for x in images_A]
-        self.A_dict = self.slice_dict(images_A)
+        # self.A_dict = self.slice_dict(images_A)
         self.A_label_path = os.path.join(self.dataroot, opts.phase + 'A_label')
 
         # B
         images_B = os.listdir(os.path.join(self.dataroot, opts.phase + 'B'))
         self.B = [os.path.join(self.dataroot, opts.phase + 'B', x) for x in images_B]
-        self.B_dict = self.slice_dict(images_B)
+        # self.B_dict = self.slice_dict(images_B)
         self.B_label_path = os.path.join(self.dataroot, opts.phase + 'B_label')
 
         self.A_size = len(self.A)
@@ -91,8 +91,8 @@ class dataset_unpair(data.Dataset):
 
         data_A_name = os.path.split(self.A[index])[-1]
         PBS_B = os.path.join(self.B[random.randint(0, self.B_size - 1)])
-        A_label_name = 'T2_label' + data_A_name.split('image')[-1]
-        B_label_name = 'C0_label' + os.path.split(PBS_B)[-1].split('image')[-1]
+        A_label_name = 'mr_label' + data_A_name.split('image')[-1]
+        B_label_name = 'ct_label' + os.path.split(PBS_B)[-1].split('image')[-1]
 
         if self.opts.phase == 'train':
             data_A, data_A_lab = self.load(self.A[index], os.path.join(self.A_label_path, A_label_name))
